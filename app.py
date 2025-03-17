@@ -49,7 +49,7 @@ def generate_chat_response(user_query):
 
     # Prepare detailed information for "Show Details"
     detailed_info = [
-        f"<small>Chunk: {chunk}</small>\nRelationship: {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}\nSource Document: {source if source else 'Unknown'}\n---"
+        f'<span style="font-size: 10px;">Chunk: {chunk}</span>\nRelationship: {relationship if relationship else "N/A"} → {related_chunk if related_chunk else "N/A"}\nSource Document: {source if source else "Unknown"}\n---'
         for chunk, relationship, related_chunk, source in graph_data
     ]
 
