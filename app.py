@@ -31,7 +31,7 @@ def query_neo4j(user_query):
         OPTIONAL MATCH (c)-[r]->(related)
         OPTIONAL MATCH (c)-[:SOURCE]->(doc:Document)
         RETURN DISTINCT c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
-        LIMIT 5
+        LIMIT 2
         """
         result = session.run(query, {"user_query": user_query})
         return [record.values() for record in result]
