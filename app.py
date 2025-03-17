@@ -7,7 +7,7 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
 # Ensure API Key is Set
 if not GEMINI_API_KEY:
-    st.error("GEMINI_API_KEY is missing.")
+    st.error("GEMINI_API_KEY is missing. Add it in Streamlit Secrets.")
     st.stop()
 
 # Initialize Gemini API with "gemini-1.5-flash"
@@ -32,7 +32,7 @@ def query_neo4j(user_query):
         OPTIONAL MATCH (c)-[r]->(related)
         RETURN c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
         ORDER BY LENGTH(c.text) DESC  // Prefer longer, content-rich chunks
-        LIMIT 4
+        LIMIT 5
         """
         result = session.run(query, {"user_query": user_query})
         return [record.values() for record in result]
@@ -90,4 +90,4 @@ if user_input:
     if detailed_info:
         if st.button("Show Details"):
             for detail in detailed_info:
-                st.markdown(f"<p style='font-size:15px;'>{detail}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size:14px;'>{detail}</p>", unsafe_allow_html=True)
