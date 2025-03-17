@@ -1,3 +1,4 @@
+
 import streamlit as st
 import google.generativeai as genai
 from neo4j import GraphDatabase
@@ -22,21 +23,21 @@ def get_neo4j_connection():
     )
     return driver
 
-# Query Neo4j for policy details
+# Improved Neo4j Query
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
         query = f"""
-        MATCH (n:Policy)-[r]->(m) 
+        MATCH (n:Policy)
         WHERE toLower(n.title) CONTAINS toLower('{user_query}') OR 
-              toLower(n.description) CONTAINS toLower('{user_query}')
-        RETURN n.title, n.description, type(r) AS relationship, m.title AS related_node, n.source LIMIT 5
+              toLower(n.description) CONTAINS toLower('{user_query}') OR
+              toLower(n.keywords) CONTAINS toLower('{user_query}')
+        RETURN n.title, n.description, n.source LIMIT 5
         """
         result = session.run(query)
         return [record.values() for record in result]
 
 # Generate Chatbot Response
 def generate_chat_response(user_query):
-    # Fetch relevant policy data from Neo4j
     graph_data = query_neo4j(user_query)
 
     # If no relevant data is found
@@ -44,14 +45,15 @@ def generate_chat_response(user_query):
         return "I couldn't find specific details in the policy. Can you rephrase or ask a different question?", []
 
     # Format policy information
-    policy_info = "\n".join([f"**{title}**: {desc}" for title, desc, _, _, _ in graph_data])
+    policy_info = "\n".join([f"**{title}**: {desc}" for title, desc, _ in graph_data])
 
-    # Prepare detailed data for later display
-    detailed_info = []
-    for title, desc, relationship, related_node, source in graph_data:
-        detailed_info.append(f" **Policy:** {title}\n **Description:** {desc}\n  **Relationship:** {relationship} → **{related_node}**\n📄 **Source:** {source}\n---")
+    # Prepare detailed info for "Show Details"
+    detailed_info = [
+        f"🔹 **Policy:** {title}\n📌 **Description:** {desc}\n📄 **Source:** {source}\n---"
+        for title, desc, source in graph_data
+    ]
 
-    # Prompt Gemini with only relevant policy info
+    # Gemini AI Prompt
     prompt = f"""
     You are a chatbot that answers questions directly based on banking policy documents. 
     Here is the relevant information retrieved from the database:
@@ -70,21 +72,17 @@ def generate_chat_response(user_query):
         return f"Error with Gemini API: {str(e)}", []
 
 # Streamlit UI
-st.title("Graph LLM Chatbot")
-st.write("Ask any questions related to the policies")
+st.title("📜 Bank Policy Chatbot (Neo4j + Gemini)")
+st.write("💡 Ask a question related to bank policies!")
 
-# User input
-user_input = st.text_input(" Your question:")
+user_input = st.text_input("🔍 Your question:")
 
 if user_input:
-    # Get chatbot response and detailed data
     response, detailed_info = generate_chat_response(user_input)
-    
-    # Show direct chatbot response first
     st.markdown(f"**🤖 Chatbot Response:**\n\n{response}")
 
-    # Show details only when button is clicked
+    # Show details button
     if detailed_info:
-        if st.button("Show Details"):
+        if st.button("📑 Show Details"):
             for detail in detailed_info:
                 st.markdown(detail)
