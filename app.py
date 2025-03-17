@@ -22,7 +22,7 @@ def get_neo4j_connection():
     )
     return driver
 
-# Improved Neo4j Query for Unique Chunks
+# Updated Neo4j Query to Extract PDF Name from Chunks
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
         query = """
@@ -30,7 +30,8 @@ def query_neo4j(user_query):
         WHERE toLower(c.text) CONTAINS toLower($user_query)
         OPTIONAL MATCH (c)-[r]->(related)
         OPTIONAL MATCH (c)-[:SOURCE]->(doc:Document)
-        RETURN DISTINCT c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
+        RETURN DISTINCT c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, 
+                        doc.name AS source, SPLIT(c.text, '\\n')[0] AS extracted_pdf_name
         LIMIT 5
         """
         result = session.run(query, {"user_query": user_query})
@@ -45,7 +46,7 @@ def generate_chat_response(user_query):
         return "No specific details were found in the policy. Please try rephrasing your question.", []
 
     # Extracting chunks for Gemini
-    policy_info = "\n".join([f"- {chunk[:300]}..." if len(chunk) > 300 else f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
+    policy_info = "\n".join([f"- {chunk[:300]}..." if len(chunk) > 300 else f"- {chunk}" for chunk, _, _, _, _ in graph_data if chunk])
 
     # Prepare detailed information for "Show Details"
     detailed_info = [
@@ -53,10 +54,10 @@ def generate_chat_response(user_query):
         <div style="font-size:14px; padding:10px; border-bottom: 1px solid #ddd;">
         <b>Chunk:</b> {chunk[:300]}...<br>
         <b>Relationship:</b> {relationship if relationship else "N/A"} → {related_chunk if related_chunk else "N/A"}<br>
-        <b>Source Document:</b> {source if source else "Unknown"}
+        <b>Source Document:</b> {extracted_pdf_name if extracted_pdf_name else "Unknown"}
         </div>
         """
-        for chunk, relationship, related_chunk, source in graph_data
+        for chunk, relationship, related_chunk, source, extracted_pdf_name in graph_data
     ]
 
     # Gemini AI Prompt for Direct Answer
@@ -91,4 +92,4 @@ if user_input:
     if detailed_info:
         if st.button("Show Details"):
             for detail in detailed_info:
-                st.markdown(detail, unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size:14px;'>{detail}</p>", unsafe_allow_html=True)
