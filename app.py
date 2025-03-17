@@ -22,37 +22,65 @@ def get_neo4j_connection():
     )
     return driver
 
-# Query Neo4j
-def query_neo4j(query):
+# Query Neo4j for chunks, relationships, and source document
+def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
+        query = f"""
+        MATCH (c:Chunk)-[r]->(related), (c)-[:SOURCE]->(doc:Document)
+        WHERE toLower(c.text) CONTAINS toLower('{user_query}')
+        RETURN c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
+        LIMIT 5
+        """
         result = session.run(query)
         return [record.values() for record in result]
 
-# Generate Chatbot Response
+# Generate Direct Chatbot Response
 def generate_chat_response(user_query):
-    # Fetch relevant data from Neo4j
-    neo4j_query = f"""
-    MATCH (n) WHERE toLower(n.name) CONTAINS toLower('{user_query}')
-    RETURN n.name, n.description LIMIT 5
+    graph_data = query_neo4j(user_query)
+
+    # If no relevant data is found
+    if not graph_data:
+        return "No specific details were found in the policy. Please try rephrasing your question.", []
+
+    # Extracting chunks for Gemini
+    policy_info = "\n".join([f"- {chunk}" for chunk, _, _, _ in graph_data])
+
+    # Prepare detailed information
+    detailed_info = [
+        f"Chunk: {chunk}\nRelationship: {relationship} → {related_chunk}\nSource Document: {source}\n---"
+        for chunk, relationship, related_chunk, source in graph_data
+    ]
+
+    # Gemini AI Prompt for a Short Answer
+    prompt = f"""
+    You are a chatbot that provides concise answers based on policy documents.
+    Below is the relevant information from the database:
+
+    {policy_info}
+
+    Question: {user_query}
+    Provide a clear and professional response in 2-3 sentences.
     """
-    graph_data = query_neo4j(neo4j_query)
 
-    context = "Here is some relevant data from our Neo4j database:\n"
-    context += "\n".join([f"- {name}: {desc}" for name, desc in graph_data])
-
-    # Send Query to Gemini
+    # Call Gemini API
     try:
-        response = model.generate_content(f"{context}\nUser query: {user_query}")
-        return response.text if response else "Sorry, I couldn't find a good answer."
+        response = model.generate_content(prompt)
+        return response.text.strip() if response else "No relevant information was found.", detailed_info
     except Exception as e:
-        return f"Error with Gemini API: {str(e)}"
+        return f"An error occurred while retrieving data: {str(e)}", []
 
 # Streamlit UI
-st.title("Neo4j-Powered Chatbot (Gemini 1.5 Flash)")
-st.write("Ask me anything related to the graph database!")
+st.title("Bank Policy Chatbot")
+st.write("Ask a question related to bank policies.")
 
-user_input = st.text_input("Your question:")
+user_input = st.text_input("Enter your question:")
 
 if user_input:
-    response = generate_chat_response(user_input)
+    response, detailed_info = generate_chat_response(user_input)
     st.markdown(f"**Chatbot Response:**\n\n{response}")
+
+    # Show details button
+    if detailed_info:
+        if st.button("Show Details"):
+            for detail in detailed_info:
+                st.markdown(detail)
