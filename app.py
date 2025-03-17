@@ -22,19 +22,21 @@ def get_neo4j_connection():
     )
     return driver
 
-# Query Neo4j for chunks, relationships, and source document
+# Improved Neo4j Query for Chunks, Relationships, and Source
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
-        query = f"""
-        MATCH (c:Chunk)-[r]->(related), (c)-[:SOURCE]->(doc:Document)
-        WHERE toLower(c.text) CONTAINS toLower('{user_query}')
+        query = """
+        MATCH (c:Chunk)
+        WHERE toLower(c.text) CONTAINS toLower($user_query)
+        OPTIONAL MATCH (c)-[r]->(related)
+        OPTIONAL MATCH (c)-[:SOURCE]->(doc:Document)
         RETURN c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
         LIMIT 5
         """
-        result = session.run(query)
+        result = session.run(query, {"user_query": user_query})
         return [record.values() for record in result]
 
-# Generate Direct Chatbot Response
+# Generate Chatbot Response
 def generate_chat_response(user_query):
     graph_data = query_neo4j(user_query)
 
@@ -43,15 +45,15 @@ def generate_chat_response(user_query):
         return "No specific details were found in the policy. Please try rephrasing your question.", []
 
     # Extracting chunks for Gemini
-    policy_info = "\n".join([f"- {chunk}" for chunk, _, _, _ in graph_data])
+    policy_info = "\n".join([f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
 
-    # Prepare detailed information
+    # Prepare detailed information for "Show Details"
     detailed_info = [
-        f"Chunk: {chunk}\nRelationship: {relationship} → {related_chunk}\nSource Document: {source}\n---"
+        f"Chunk: {chunk}\nRelationship: {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}\nSource Document: {source if source else 'Unknown'}\n---"
         for chunk, relationship, related_chunk, source in graph_data
     ]
 
-    # Gemini AI Prompt for a Short Answer
+    # Gemini AI Prompt for Direct Answer
     prompt = f"""
     You are a chatbot that provides concise answers based on policy documents.
     Below is the relevant information from the database:
