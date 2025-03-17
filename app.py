@@ -22,14 +22,14 @@ def get_neo4j_connection():
     )
     return driver
 
-# Improved Neo4j Query to Reduce Repetition
+# Improved Neo4j Query for Chunks, Relationships, and Source
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
         query = """
-        MATCH (c:Chunk)-[:SOURCE]->(doc:Document)
+        MATCH (c:Chunk)
         WHERE toLower(c.text) CONTAINS toLower($user_query)
-        WITH c, doc ORDER BY size(c.text) DESC  // Sort by chunk size to prioritize detailed data
         OPTIONAL MATCH (c)-[r]->(related)
+        OPTIONAL MATCH (c)-[:SOURCE]->(doc:Document)
         RETURN DISTINCT c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
         LIMIT 5
         """
@@ -45,13 +45,11 @@ def generate_chat_response(user_query):
         return "No specific details were found in the policy. Please try rephrasing your question.", []
 
     # Extracting chunks for Gemini
-    policy_info = "\n".join([f"- {chunk[:300]}..." if len(chunk) > 300 else f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
+    policy_info = "\n".join([f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
 
     # Prepare detailed information for "Show Details"
     detailed_info = [
-        f"<p style='font-size:12px;'><b>Chunk:</b> {chunk[:300]}...<br>"
-        f"<b>Relationship:</b> {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}<br>"
-        f"<b>Source Document:</b> {source if source else 'Unknown'}</p><hr>"
+        f"<small>Chunk: {chunk}</small>\nRelationship: {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}\nSource Document: {source if source else 'Unknown'}\n---"
         for chunk, relationship, related_chunk, source in graph_data
     ]
 
@@ -87,4 +85,4 @@ if user_input:
     if detailed_info:
         if st.button("Show Details"):
             for detail in detailed_info:
-                st.markdown(f"<p style='font-size:12px;'>{detail}</p>", unsafe_allow_html=True)
+                st.markdown(detail, unsafe_allow_html=True)
