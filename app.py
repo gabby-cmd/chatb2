@@ -49,7 +49,7 @@ def generate_chat_response(user_query):
 
     # Prepare detailed information for "Show Details"
     detailed_info = [
-        f"Chunk: {chunk}\nRelationship: {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}\nSource Document: {source if source else 'Unknown'}\n---"
+        f"**Chunk:** {chunk}\n**Relationship:** {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}\n**Source:** {source if source else 'Unknown'}\n---"
         for chunk, relationship, related_chunk, source in graph_data
     ]
 
@@ -85,4 +85,4 @@ if user_input:
     if detailed_info:
         if st.button("Show Details"):
             for detail in detailed_info:
-                st.markdown(detail)
+                st.markdown(f"<p style='font-size:14px;'>{detail}</p>", unsafe_allow_html=True)
