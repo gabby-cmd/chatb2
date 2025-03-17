@@ -22,20 +22,24 @@ def get_neo4j_connection():
     )
     return driver
 
-
+# Improved Neo4j Query for Debugging
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
         query = """
         MATCH (c:Chunk)-[:SOURCE]->(doc:Document)
         WHERE toLower(c.text) CONTAINS toLower($user_query)
-        AND NOT toLower(c.text) CONTAINS 'introduction'  // Exclude generic intro text
         OPTIONAL MATCH (c)-[r]->(related)
         RETURN c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
-        ORDER BY size(c.text) DESC  // Corrected: Use size() instead of LENGTH()
+        ORDER BY size(c.text) DESC
         LIMIT 5
         """
         result = session.run(query, {"user_query": user_query})
-        return [record.values() for record in result]
+        data = [record.values() for record in result]
+
+        # Debugging: Print retrieved data
+        st.write("🔍 Neo4j Query Results:", data)
+
+        return data
 
 # Generate Chatbot Response
 def generate_chat_response(user_query):
