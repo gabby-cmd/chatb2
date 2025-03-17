@@ -1,4 +1,3 @@
-
 import streamlit as st
 import google.generativeai as genai
 from neo4j import GraphDatabase
@@ -23,7 +22,7 @@ def get_neo4j_connection():
     )
     return driver
 
-# Improved Neo4j Query
+# Query Neo4j for policy details
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
         query = f"""
@@ -39,6 +38,9 @@ def query_neo4j(user_query):
 # Generate Chatbot Response
 def generate_chat_response(user_query):
     graph_data = query_neo4j(user_query)
+
+    # Debugging: Print if Neo4j returned any results
+    st.write(f"🔍 Neo4j Query Results: {graph_data}")
 
     # If no relevant data is found
     if not graph_data:
@@ -64,11 +66,20 @@ def generate_chat_response(user_query):
     Answer concisely and directly based on the provided data.
     """
 
+    # Debugging: Print the prompt sent to Gemini
+    st.write(f"📢 Gemini Prompt: {prompt}")
+
     # Call Gemini API
     try:
         response = model.generate_content(prompt)
+
+        # Debugging: Print raw response from Gemini
+        st.write(f"✅ Gemini Raw Response: {response}")
+
         return response.text.strip() if response else "Sorry, I couldn't find a good answer.", detailed_info
+
     except Exception as e:
+        st.error(f"❌ Error with Gemini API: {str(e)}")
         return f"Error with Gemini API: {str(e)}", []
 
 # Streamlit UI
