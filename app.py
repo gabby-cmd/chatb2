@@ -22,7 +22,7 @@ def get_neo4j_connection():
     )
     return driver
 
-# Improved Neo4j Query for Chunks, Relationships, and Source
+# Improved Neo4j Query for Unique Chunks
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
         query = """
@@ -45,11 +45,17 @@ def generate_chat_response(user_query):
         return "No specific details were found in the policy. Please try rephrasing your question.", []
 
     # Extracting chunks for Gemini
-    policy_info = "\n".join([f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
+    policy_info = "\n".join([f"- {chunk[:300]}..." if len(chunk) > 300 else f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
 
     # Prepare detailed information for "Show Details"
     detailed_info = [
-        f'<span style="font-size: 10px;">Chunk: {chunk}</span>\nRelationship: {relationship if relationship else "N/A"} → {related_chunk if related_chunk else "N/A"}\nSource Document: {source if source else "Unknown"}\n---'
+        f"""
+        <div style="font-size:14px; padding:10px; border-bottom: 1px solid #ddd;">
+        <b>Chunk:</b> {chunk[:300]}...<br>
+        <b>Relationship:</b> {relationship if relationship else "N/A"} → {related_chunk if related_chunk else "N/A"}<br>
+        <b>Source Document:</b> {source if source else "Unknown"}
+        </div>
+        """
         for chunk, relationship, related_chunk, source in graph_data
     ]
 
