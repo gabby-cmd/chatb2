@@ -22,19 +22,18 @@ def get_neo4j_connection():
     )
     return driver
 
-# Query Neo4j
+# Improved Neo4j Query for Unique Chunks
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
-        query = f"""
-        MATCH (n) WHERE toLower(n.name) CONTAINS toLower('{user_query}')
-        OPTIONAL MATCH (n)-[r]->(related)
-        OPTIONAL MATCH (n)-[:SOURCE]->(doc:Document)
-        RETURN DISTINCT n.name AS node_name, n.description AS description, 
-                        type(r) AS relationship, related.name AS related_node, 
-                        doc.name AS source
+        query = """
+        MATCH (c:Chunk)
+        WHERE toLower(c.text) CONTAINS toLower($user_query)
+        OPTIONAL MATCH (c)-[r]->(related)
+        OPTIONAL MATCH (c)-[:SOURCE]->(doc:Document)
+        RETURN DISTINCT c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
         LIMIT 5
         """
-        result = session.run(query)
+        result = session.run(query, {"user_query": user_query})
         return [record.values() for record in result]
 
 # Generate Chatbot Response
@@ -43,27 +42,26 @@ def generate_chat_response(user_query):
 
     # If no relevant data is found
     if not graph_data:
-        return "No specific details were found in the database. Please try rephrasing your question.", []
+        return "No specific details were found in the policy. Please try rephrasing your question.", []
 
-    # Extracting information for Gemini
-    policy_info = "\n".join([f"- {node_name}: {description}" for node_name, description, _, _, _ in graph_data if node_name])
+    # Extracting chunks for Gemini
+    policy_info = "\n".join([f"- {chunk[:300]}..." if len(chunk) > 300 else f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
 
     # Prepare detailed information for "Show Details"
     detailed_info = [
         f"""
         <div style="font-size:14px; padding:10px; border-bottom: 1px solid #ddd;">
-        <b>Node:</b> {node_name}<br>
-        <b>Description:</b> {description}<br>
-        <b>Relationship:</b> {relationship if relationship else "N/A"} → {related_node if related_node else "N/A"}<br>
+        <b>Chunk:</b> {chunk[:300]}...<br>
+        <b>Relationship:</b> {relationship if relationship else "N/A"} → {related_chunk if related_chunk else "N/A"}<br>
         <b>Source Document:</b> {source if source else "Unknown"}
         </div>
         """
-        for node_name, description, relationship, related_node, source in graph_data
+        for chunk, relationship, related_chunk, source in graph_data
     ]
 
     # Gemini AI Prompt for Direct Answer
     prompt = f"""
-    You are a chatbot that provides concise answers based on Neo4j data.
+    You are a chatbot that provides concise answers based on policy documents.
     Below is the relevant information from the database:
 
     {policy_info}
@@ -80,10 +78,10 @@ def generate_chat_response(user_query):
         return f"An error occurred while retrieving data: {str(e)}", []
 
 # Streamlit UI
-st.title("Neo4j-Powered Chatbot")
-st.write("Ask a question related to the graph database.")
+st.title("Bank Policy Chatbot")
+st.write("Ask a question related to bank policies.")
 
-user_input = st.text_input("Your question:")
+user_input = st.text_input("Enter your question:")
 
 if user_input:
     response, detailed_info = generate_chat_response(user_input)
@@ -93,4 +91,4 @@ if user_input:
     if detailed_info:
         if st.button("Show Details"):
             for detail in detailed_info:
-                st.markdown(f"<p style='font-size:14px;'>{detail}</p>", unsafe_allow_html=True)
+                st.markdown(detail, unsafe_allow_html=True)
