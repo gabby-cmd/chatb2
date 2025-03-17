@@ -22,7 +22,7 @@ def get_neo4j_connection():
     )
     return driver
 
-# Improved Neo4j Query for Chunks, Relationships, and Source
+
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
         query = """
@@ -31,7 +31,7 @@ def query_neo4j(user_query):
         AND NOT toLower(c.text) CONTAINS 'introduction'  // Exclude generic intro text
         OPTIONAL MATCH (c)-[r]->(related)
         RETURN c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
-        ORDER BY LENGTH(c.text) DESC  // Prefer longer, content-rich chunks
+        ORDER BY size(c.text) DESC  // Corrected: Use size() instead of LENGTH()
         LIMIT 5
         """
         result = session.run(query, {"user_query": user_query})
