@@ -44,21 +44,25 @@ def generate_chat_response(user_query):
     if not graph_data:
         return "No specific details were found in the policy. Please try rephrasing your question.", []
 
-    # Extracting chunks for Gemini
-    policy_info = "\n".join([f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
-
-    # Prepare detailed information for "Show Details"
-    detailed_info = [
-        f"**Chunk:** {chunk}\n**Relationship:** {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}\n**Source:** {source if source else 'Unknown'}\n---"
-        for chunk, relationship, related_chunk, source in graph_data
-    ]
+    # Extracting and trimming chunk data
+    detailed_info = []
+    for chunk, relationship, related_chunk, source in graph_data:
+        trimmed_chunk = chunk[:300] + "..." if len(chunk) > 300 else chunk  # Shorten long text
+        related_info = related_chunk if related_chunk else "N/A"
+        source_info = source if source else "Unknown"
+        
+        detailed_info.append(
+            f"**Chunk (Summary):** {trimmed_chunk}\n"
+            f"**Relationship:** {relationship if relationship else 'None'} → {related_info}\n"
+            f"**Source Document:** {source_info}\n---"
+        )
 
     # Gemini AI Prompt for Direct Answer
     prompt = f"""
     You are a chatbot that provides concise answers based on policy documents.
     Below is the relevant information from the database:
 
-    {policy_info}
+    {detailed_info[0] if detailed_info else 'No relevant policy information found.'}
 
     Question: {user_query}
     Provide a clear and professional response in 2-3 sentences.
