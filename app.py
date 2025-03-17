@@ -22,15 +22,15 @@ def get_neo4j_connection():
     )
     return driver
 
-# Improved Neo4j Query for Chunks, Relationships, and Source
+# Improved Neo4j Query to Reduce Repetition
 def query_neo4j(user_query):
     with get_neo4j_connection().session() as session:
         query = """
-        MATCH (c:Chunk)
+        MATCH (c:Chunk)-[:SOURCE]->(doc:Document)
         WHERE toLower(c.text) CONTAINS toLower($user_query)
+        WITH c, doc ORDER BY size(c.text) DESC  // Sort by chunk size to prioritize detailed data
         OPTIONAL MATCH (c)-[r]->(related)
-        OPTIONAL MATCH (c)-[:SOURCE]->(doc:Document)
-        RETURN c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
+        RETURN DISTINCT c.text AS chunk, type(r) AS relationship, related.text AS related_chunk, doc.name AS source
         LIMIT 5
         """
         result = session.run(query, {"user_query": user_query})
@@ -45,11 +45,13 @@ def generate_chat_response(user_query):
         return "No specific details were found in the policy. Please try rephrasing your question.", []
 
     # Extracting chunks for Gemini
-    policy_info = "\n".join([f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
+    policy_info = "\n".join([f"- {chunk[:300]}..." if len(chunk) > 300 else f"- {chunk}" for chunk, _, _, _ in graph_data if chunk])
 
     # Prepare detailed information for "Show Details"
     detailed_info = [
-        f"Chunk: {chunk}\nRelationship: {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}\nSource Document: {source if source else 'Unknown'}\n---"
+        f"<p style='font-size:12px;'><b>Chunk:</b> {chunk[:300]}...<br>"
+        f"<b>Relationship:</b> {relationship if relationship else 'N/A'} → {related_chunk if related_chunk else 'N/A'}<br>"
+        f"<b>Source Document:</b> {source if source else 'Unknown'}</p><hr>"
         for chunk, relationship, related_chunk, source in graph_data
     ]
 
@@ -85,4 +87,4 @@ if user_input:
     if detailed_info:
         if st.button("Show Details"):
             for detail in detailed_info:
-                st.markdown(detail)
+                st.markdown(f"<p style='font-size:12px;'>{detail}</p>", unsafe_allow_html=True)
