@@ -7,7 +7,7 @@ GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 
 # Ensure API Key is Set
 if not GEMINI_API_KEY:
-    st.error("GEMINI_API_KEY is missing. Add it in Streamlit Secrets.")
+    st.error("GEMINI_API_KEY is missing.")
     st.stop()
 
 # Initialize Gemini API with "gemini-1.5-flash"
@@ -78,7 +78,7 @@ def generate_chat_response(user_query):
         return f"An error occurred while retrieving data: {str(e)}", []
 
 # Streamlit UI
-st.title("Bank Policy Chatbot")
+st.title("Neo-4j powered Chatbot (Gemini 1.5 flash) ")
 st.write("Ask a question related to bank policies.")
 
 user_input = st.text_input("Enter your question:")
