@@ -22,78 +22,37 @@ def get_neo4j_connection():
     )
     return driver
 
-# Query Neo4j for policy details
-def query_neo4j(user_query):
+# Query Neo4j
+def query_neo4j(query):
     with get_neo4j_connection().session() as session:
-        query = f"""
-        MATCH (n:Policy)
-        WHERE toLower(n.title) CONTAINS toLower('{user_query}') OR 
-              toLower(n.description) CONTAINS toLower('{user_query}') OR
-              toLower(n.keywords) CONTAINS toLower('{user_query}')
-        RETURN n.title, n.description, n.source LIMIT 5
-        """
         result = session.run(query)
         return [record.values() for record in result]
 
 # Generate Chatbot Response
 def generate_chat_response(user_query):
-    graph_data = query_neo4j(user_query)
-
-    # Debugging: Print if Neo4j returned any results
-    st.write(f"🔍 Neo4j Query Results: {graph_data}")
-
-    # If no relevant data is found
-    if not graph_data:
-        return "I couldn't find specific details in the policy. Can you rephrase or ask a different question?", []
-
-    # Format policy information
-    policy_info = "\n".join([f"**{title}**: {desc}" for title, desc, _ in graph_data])
-
-    # Prepare detailed info for "Show Details"
-    detailed_info = [
-        f"🔹 **Policy:** {title}\n📌 **Description:** {desc}\n📄 **Source:** {source}\n---"
-        for title, desc, source in graph_data
-    ]
-
-    # Gemini AI Prompt
-    prompt = f"""
-    You are a chatbot that answers questions directly based on banking policy documents. 
-    Here is the relevant information retrieved from the database:
-
-    {policy_info}
-
-    Question: {user_query}
-    Answer concisely and directly based on the provided data.
+    # Fetch relevant data from Neo4j
+    neo4j_query = f"""
+    MATCH (n) WHERE toLower(n.name) CONTAINS toLower('{user_query}')
+    RETURN n.name, n.description LIMIT 5
     """
+    graph_data = query_neo4j(neo4j_query)
 
-    # Debugging: Print the prompt sent to Gemini
-    st.write(f"📢 Gemini Prompt: {prompt}")
+    context = "Here is some relevant data from our Neo4j database:\n"
+    context += "\n".join([f"- {name}: {desc}" for name, desc in graph_data])
 
-    # Call Gemini API
+    # Send Query to Gemini
     try:
-        response = model.generate_content(prompt)
-
-        # Debugging: Print raw response from Gemini
-        st.write(f"✅ Gemini Raw Response: {response}")
-
-        return response.text.strip() if response else "Sorry, I couldn't find a good answer.", detailed_info
-
+        response = model.generate_content(f"{context}\nUser query: {user_query}")
+        return response.text if response else "Sorry, I couldn't find a good answer."
     except Exception as e:
-        st.error(f"❌ Error with Gemini API: {str(e)}")
-        return f"Error with Gemini API: {str(e)}", []
+        return f"Error with Gemini API: {str(e)}"
 
 # Streamlit UI
-st.title("📜 Bank Policy Chatbot (Neo4j + Gemini)")
-st.write("💡 Ask a question related to bank policies!")
+st.title("Neo4j-Powered Chatbot (Gemini 1.5 Flash)")
+st.write("Ask me anything related to the graph database!")
 
-user_input = st.text_input("🔍 Your question:")
+user_input = st.text_input("Your question:")
 
 if user_input:
-    response, detailed_info = generate_chat_response(user_input)
-    st.markdown(f"**🤖 Chatbot Response:**\n\n{response}")
-
-    # Show details button
-    if detailed_info:
-        if st.button("📑 Show Details"):
-            for detail in detailed_info:
-                st.markdown(detail)
+    response = generate_chat_response(user_input)
+    st.markdown(f"**Chatbot Response:**\n\n{response}")
